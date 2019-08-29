@@ -1,0 +1,60 @@
+---
+- hosts: localhost
+  become: yes
+  tasks:
+    - name: Create folders at the system holding HTTPD conf & html files
+      file:
+        path: "{{ item }}"
+        state: directory
+        recurse: yes
+        mode: "u=rwx,g=rwx,o=rx"
+        with_items:
+          - "/system_path/"
+          
+    - name: Add  Git Repo 
+      git:
+        repo: '<<GIT URL>>'
+        dest: /system_path/docker/
+        version: develop
+        accept_hostkey: yes
+        recursive: no
+
+    - name: login to repo
+      docker_login:
+              registry: 
+              username: 
+              password: 
+              reauthorize: yes
+
+    - name: building
+      docker_image:
+              path: /system_path/docker
+              name: << image_name >>
+              tag: v1
+              push: yes
+			  
+    - name: Stop and remove HTTPD container if any
+      docker_container:
+        name: "{{ HTTPD_CONTAINER_NAME }}"
+        state: absent
+  
+    - name: Pull docker image
+      docker_image:
+        name: <<image name>>
+        tag: tag
+
+    - name: Deploy container
+      docker_container:
+          name: "{{ HTTPD_CONTAINER_NAME }}"
+          image: <<image name>>:tag
+          restart_policy: unless-stopped
+          log_driver: json-file
+          log_options:
+            max-size: 200m
+          ports:
+                  - "9000:80"
+          volumes:
+                  - /system_path/html/:/var/www/html/
+				  - /system_path/conf/:/etc/httpd/
+          state: started
+          restart: yes
